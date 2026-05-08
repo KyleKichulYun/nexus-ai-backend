@@ -8,8 +8,9 @@ import { ChatModule } from './modules/chat/chat.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // 전역에서 ConfigService 사용 가능
-      envFilePath: '.env',
+      isGlobal: true,
+      // Doppler가 주입한 고유 환경 변수가 존재하면 .env를 무시합니다.
+      ignoreEnvFile: process.env.DOPPLER_ENVIRONMENT !== undefined,
     }),
     AiModule,
     ChatModule,
