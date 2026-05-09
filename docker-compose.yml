@@ -23,3 +23,15 @@ services:
     ports:
       - '6379:6379'
     restart: unless-stopped
+
+  # docker-compose.yml 하단에 추가
+  postgres:
+    image: postgres:15-alpine
+    container_name: nexus-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: nexus_user
+      POSTGRES_PASSWORD: nexus_password
+      POSTGRES_DB: nexus_ai_db
+    restart: unless-stopped
