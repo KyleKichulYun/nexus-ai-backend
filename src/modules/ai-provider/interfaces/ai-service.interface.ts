@@ -1,16 +1,17 @@
 import { Observable } from 'rxjs';
 
-// NestJS DI 컨테이너에서 사용할 고유 토큰
 export const AI_SERVICE_TOKEN = Symbol('AI_SERVICE_TOKEN');
 
-export interface IAiService {
-  /**
-   * 단일 텍스트 응답을 생성합니다. (일반적인 REST API 용도)
-   */
-  generateText(prompt: string): Promise<string>;
+// 옵션 타입 정의 추가
+export interface AiCallOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
 
-  /**
-   * SSE 스트리밍을 위한 텍스트 청크를 Observable로 반환합니다.
-   */
-  generateStream(prompt: string): Observable<string>;
+export interface IAiService {
+  generateText(prompt: string, options?: AiCallOptions): Promise<string>;
+
+  // 두 번째 파라미터로 options를 받을 수 있도록 수정
+  generateStream(prompt: string, options?: AiCallOptions): Observable<string>;
 }

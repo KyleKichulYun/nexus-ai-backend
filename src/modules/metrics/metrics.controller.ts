@@ -8,7 +8,7 @@ export class MetricsController {
   @Get('connections')
   getConnectionCount() {
     return {
-      activeConnections: this.metricsService.getActiveConnections(),
+      ...this.metricsService.getMetrics(),
       timestamp: new Date().toISOString(),
     };
   }
