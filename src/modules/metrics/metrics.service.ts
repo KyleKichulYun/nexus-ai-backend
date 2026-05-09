@@ -1,60 +1,91 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Redis } from 'ioredis';
 import * as geoip from 'geoip-lite';
 
 @Injectable()
-export class MetricsService {
+export class MetricsService implements OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
-  private totalConnections = 0;
-  private countryConnections: Record<string, number> = {};
+  private readonly redis: Redis;
 
-  incrementConnection(ip: string) {
-    this.totalConnections++;
+  constructor(private configService: ConfigService) {
+    // ConfigService를 통해 Redis 주소를 가져옵니다.
+    const redisUrl =
+      this.configService.get<string>('REDIS_URL') || 'redis://127.0.0.1:6379';
+    this.redis = new Redis(redisUrl);
+  }
+
+  async incrementConnection(ip: string) {
     const country = this.getCountryFromIp(ip);
 
-    this.countryConnections[country] =
-      (this.countryConnections[country] || 0) + 1;
+    // 원자적 연산으로 Redis 카운트 증가
+    const total = await this.redis.incr('metrics:total');
+    const countryTotal = await this.redis.hincrby(
+      'metrics:country',
+      country,
+      1,
+    );
+
     this.logger.log(
-      `Active [Total: ${this.totalConnections}] | Country [${country}]: ${this.countryConnections[country]}`,
+      `Active [Total: ${total}] | Country [${country}]: ${countryTotal}`,
     );
   }
 
-  decrementConnection(ip: string) {
-    this.totalConnections = Math.max(0, this.totalConnections - 1);
+  async decrementConnection(ip: string) {
     const country = this.getCountryFromIp(ip);
 
-    if (this.countryConnections[country]) {
-      this.countryConnections[country] = Math.max(
-        0,
-        this.countryConnections[country] - 1,
-      );
+    // 원자적 연산으로 Redis 카운트 감소
+    const total = await this.redis.decr('metrics:total');
+    if (total < 0) await this.redis.set('metrics:total', 0); // 방어 로직
 
-      // 메모리 누수 방지를 위해 카운트가 0이 된 국가는 객체에서 제거
-      if (this.countryConnections[country] === 0) {
-        delete this.countryConnections[country];
-      }
+    const countryTotal = await this.redis.hincrby(
+      'metrics:country',
+      country,
+      -1,
+    );
+
+    // 0이 된 국가는 Hash에서 깔끔하게 삭제
+    if (countryTotal <= 0) {
+      await this.redis.hdel('metrics:country', country);
     }
+
     this.logger.log(
-      `Active [Total: ${this.totalConnections}] | Country [${country}]: ${this.countryConnections[country] || 0}`,
+      `Active [Total: ${Math.max(0, total)}] | Country [${country}]: ${Math.max(0, countryTotal)}`,
     );
   }
 
-  getMetrics() {
+  async getMetrics() {
+    // 다건의 데이터를 한 번에 가져옴
+    const total = await this.redis.get('metrics:total');
+    const byCountry = await this.redis.hgetall('metrics:country');
+
+    // Redis HGETALL은 문자열로 반환하므로 숫자로 변환
+    const formattedByCountry = Object.entries(byCountry).reduce(
+      (acc, [key, value]) => {
+        acc[key] = parseInt(value, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
     return {
-      totalConnections: this.totalConnections,
-      byCountry: this.countryConnections,
+      totalConnections: parseInt(total || '0', 10),
+      byCountry: formattedByCountry,
     };
   }
 
-  /**
-   * IP 주소를 기반으로 ISO 3166-1 alpha-2 국가 코드를 반환합니다.
-   */
   private getCountryFromIp(ip: string): string {
-    // 로컬 환경 테스트를 위한 예외 처리 (로컬 IP는 위치 정보가 없음)
     if (ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1')) {
-      return 'KR'; // 테스트를 위해 한국으로 기본값 설정
+      return 'KR';
     }
+    // 외부 라이브러리의 타입 추론 한계를 명시적으로 예외 처리하고 안전하게 사용합니다.
+    const geo = geoip.lookup(ip) as { country: string } | null;
 
-    const geo = geoip.lookup(ip);
     return geo ? geo.country : 'Unknown';
+  }
+
+  // Redis 종료 시의 Floating Promise 문제 해결 (async/await 추가)
+  async onModuleDestroy() {
+    await this.redis.quit();
   }
 }
