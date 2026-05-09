@@ -1,4 +1,4 @@
-import { Controller, Query, Sse, MessageEvent } from '@nestjs/common';
+import { Controller, Query, Sse, MessageEvent, Ip } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map, finalize } from 'rxjs/operators';
 import { ChatService } from './chat.service';
@@ -8,11 +8,14 @@ import { MetricsService } from '../metrics/metrics.service';
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,
-    private readonly metricsService: MetricsService, // 의존성 주입
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Sse('stream')
-  stream(@Query('message') message: string): Observable<MessageEvent> {
+  stream(
+    @Query('message') message: string,
+    @Ip() ip: string, // 클라이언트 IP 추출
+  ): Observable<MessageEvent> {
     if (!message) {
       return new Observable<MessageEvent>((subscriber) => {
         subscriber.next({ data: 'Message is required.' });
@@ -20,16 +23,12 @@ export class ChatController {
       });
     }
 
-    // 클라이언트가 엔드포인트에 접속하면 카운트 증가
-    this.metricsService.incrementConnection();
+    this.metricsService.incrementConnection(ip); // IP 전달
 
     return this.chatService.streamChatResponse(message).pipe(
-      map((chunk) => ({
-        data: chunk,
-      })),
-      // 응답이 완료되거나 클라이언트가 연결을 끊으면 카운트 감소
+      map((chunk) => ({ data: chunk })),
       finalize(() => {
-        this.metricsService.decrementConnection();
+        this.metricsService.decrementConnection(ip); // IP 전달
       }),
     );
   }

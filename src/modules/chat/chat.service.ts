@@ -1,9 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import {
-  AI_SERVICE_TOKEN,
-  IAiService,
-} from '../ai-provider/interfaces/ai-service.interface';
+import { AI_SERVICE_TOKEN } from '../ai-provider/interfaces/ai-service.interface';
+import type { IAiService } from '../ai-provider/interfaces/ai-service.interface';
 
 @Injectable()
 export class ChatService {
