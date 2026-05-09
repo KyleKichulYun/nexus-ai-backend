@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiModule } from './modules/ai-provider/ai.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ChatModule } from './modules/chat/chat.module';
     }),
     AiModule,
     ChatModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
