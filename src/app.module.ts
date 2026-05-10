@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AiModule } from './modules/ai-provider/ai.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     AiModule,
     ChatModule,
     MetricsModule,
+    PrismaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
